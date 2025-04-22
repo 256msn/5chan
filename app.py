@@ -1,58 +1,75 @@
-from flask import Flask, request, redirect, render_template, send_from_directory
+from flask import Flask, render_template, request, redirect, url_for
+import json
 import os
-from werkzeug.utils import secure_filename
+from datetime import datetime
 
 app = Flask(__name__)
-UPLOAD_FOLDER = 'static/uploads'
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['UPLOAD_FOLDER'] = 'images'
+app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'gif'}
 
-threads = []
-replies = {}
+# Ensure upload folder exists
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
+
+def load_threads():
+    try:
+        with open('threads.json', 'r') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return []
+
+def save_threads(threads):
+    with open('threads.json', 'w') as f:
+        json.dump(threads, f, indent=4)
 
 @app.route('/')
 def index():
+    threads = load_threads()
     return render_template('index.html', threads=threads)
 
 @app.route('/thread/<int:thread_id>')
 def view_thread(thread_id):
+    threads = load_threads()
     thread = next((t for t in threads if t['id'] == thread_id), None)
-    if not thread:
-        return "Thread not found", 404
-    thread_replies = replies.get(thread_id, [])
-    return render_template('thread.html', thread=thread, replies=thread_replies)
+    if thread:
+        return render_template('thread.html', thread=thread)
+    return redirect(url_for('index'))
 
-@app.route('/post_thread', methods=['POST'])
-def post_thread():
-    title = request.form['title']
-    message = request.form['message']
-    image = request.files['image']
-    filename = ''
-    if image and image.filename != '':
-        filename = secure_filename(image.filename)
-        image.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-    thread_id = len(threads) + 1
-    threads.append({'id': thread_id, 'title': title, 'message': message, 'image': filename})
-    return redirect('/')
+@app.route('/new_thread', methods=['GET', 'POST'])
+def new_thread():
+    if request.method == 'POST':
+        subject = request.form['subject']
+        content = request.form['content']
+        image = request.files['image']
+        timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+        filename = f"image_{timestamp}"
+        image_path = None
 
-@app.route('/post_reply/<int:thread_id>', methods=['POST'])
-def post_reply(thread_id):
-    message = request.form['message']
-    image = request.files['image']
-    filename = ''
-    if image and image.filename != '':
-        filename = secure_filename(image.filename)
-        image.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-    if thread_id not in replies:
-        replies[thread_id] = []
-    replies[thread_id].append({'message': message, 'image': filename})
-    return redirect(f'/thread/{thread_id}')
+        if image and allowed_file(image.filename):
+            ext = image.filename.rsplit('.', 1)[1].lower()
+            filename = f"{filename}.{ext}"
+            image.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+            image_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
 
-@app.route('/static/uploads/<filename>')
-def uploaded_file(filename):
-    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+        threads = load_threads()
+        new_thread_id = len(threads) + 1
+        new_thread = {
+            'id': new_thread_id,
+            'subject': subject,
+            'posts': [{
+                'author': 'Anonymous',
+                'content': content,
+                'image': filename if image_path else None,
+                'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            }],
+            'last_bump': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        }
+        threads.append(new_thread)
+        save_threads(threads)
+        return redirect(url_for('view_thread', thread_id=new_thread_id))
+    return render_template('post_form.html')
 
 if __name__ == '__main__':
-    import os
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(debug=True)
