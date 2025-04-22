@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <link rel="stylesheet" href="style.css">
+  <title>{{ thread.title }} - 5chan</title>
+  <style>
+    body { font-family: Arial; max-width: 700px; margin: auto; }
+    img { max-width: 300px; margin-top: 5px; }
+  </style>
+</head>
+<body>
+  <h1>{{ thread.title }}</h1>
+  <p>{{ thread.message }}</p>
+  {% if thread.image %}
+    <img src="{{ url_for('uploaded_file', filename=thread.image) }}"><br>
+  {% endif %}
+  <a href="/">← Back to board</a>
+
+  <hr>
+  <h3>Replies</h3>
+  {% for reply in replies %}
+    <div>
+      <p>{{ reply.message }}</p>
+      {% if reply.image %}
+        <img src="{{ url_for('uploaded_file', filename=reply.image) }}">
+      {% endif %}
+      <hr>
+    </div>
+  {% endfor %}
+
+  <form action="/post_reply/{{ thread.id }}" method="POST" enctype="multipart/form-data">
+    <textarea name="message" placeholder="Reply..." required></textarea><br><br>
+    <input type="file" name="image"><br><br>
+    <button type="submit">Post Reply</button>
+  </form>
+</body>
+</html>
