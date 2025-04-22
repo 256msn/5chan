@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <link rel="stylesheet" href="style.css">
+  <title>5chan - Simple Imageboard</title>
+  <style>
+    body { font-family: Arial; max-width: 700px; margin: auto; }
+    img { max-width: 200px; margin-top: 5px; }
+  </style>
+</head>
+<body>
+  <h1>5chan - Create a Thread</h1>
+  <form action="/post_thread" method="POST" enctype="multipart/form-data">
+    <input name="title" placeholder="Title" required><br><br>
+    <textarea name="message" placeholder="Message..." required></textarea><br><br>
+    <input type="file" name="image"><br><br>
+    <button type="submit">Post Thread</button>
+  </form>
+
+  <hr>
+  <h2>Threads</h2>
+  {% for thread in threads %}
+    <div>
+      <h3><a href="/thread/{{ thread.id }}">{{ thread.title }}</a></h3>
+      <p>{{ thread.message }}</p>
+      {% if thread.image %}
+        <img src="{{ url_for('uploaded_file', filename=thread.image) }}">
+      {% endif %}
+      <hr>
+    </div>
+  {% endfor %}
+</body>
+</html>
